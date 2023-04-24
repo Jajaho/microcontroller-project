@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name "PRO_MCU")(type "KiCad")(uri "${KIPRJMOD}/PRO_MCU.kicad_sym")(options "")(descr ""))
+)
