@@ -4,21 +4,21 @@
 // ItsyBitsyNRF
 #define SWITCH 4
 // chassis
-#define PUMP 9
-#define VENT 10
+#define PUMP 13
+#define VENT 12
 // Buttons & LEDs
-#define BUT_G 12
-#define LED_G 11
-#define BUT_R 7
+#define BUT_G 7
+#define LED_G 10
+#define BUT_R 9
 #define LED_R 5
 // Waveshare 17344 Display
-#define TFT_CS 17
-#define TFT_DC 16
-#define TFT_RST 15
-#define TFT_BL 14
+#define TFT_CS 18
+#define TFT_DC 19
+#define TFT_RST 17
+#define TFT_BL 16
 // MPRLS Sensor
-#define MPRLS_RST 19
-#define MPRLS_EOC 18
+#define MPRLS_RST 15
+#define MPRLS_EOC 14
 // Pin 2 MUST not be used !
 /* **************************************************************** */
 /* ********** Don’t change blow ! ******************* */
@@ -119,6 +119,7 @@ void setup()
   Serial.print("Pressure(hPa)\n");
   Serial.print(int(mpr.readPressure()));
   Serial.print("\n");
+  reader.drawBMP("heart.bmp", tft, 0, 0);
   delay(1000);
 }
 void loop()
@@ -151,6 +152,5 @@ void loop()
   Serial.print("Pressure(hPa)\n");
   Serial.print(int(mpr.readPressure()));
   Serial.print("\n");
-  reader.drawBMP("heart.bmp", tft, 0, 0);
-  delay(100);
+  
 }
