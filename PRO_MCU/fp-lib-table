@@ -1,3 +1,4 @@
 (fp_lib_table
-  (lib (name "_PRO_MCU")(type "KiCad")(uri "${KIPRJMOD}/FOOT_PRO_MCU.pretty")(options "")(descr ""))
+  (version 7)
+  (lib (name "PRO_MCU")(type "KiCad")(uri "${KIPRJMOD}/FOOT_PRO_MCU.pretty")(options "")(descr ""))
 )
