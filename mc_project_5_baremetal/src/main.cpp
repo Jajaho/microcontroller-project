@@ -21,7 +21,7 @@
 #define MPRLS_EOC 14
 // Pin 2 MUST not be used !
 /* **************************************************************** */
-/* ********** Don’t change below ! ******************* */
+/* ********** Don’t change blow ! ******************* */
 /* **************************************************************** */
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h> // for Serial
