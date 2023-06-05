@@ -10,7 +10,6 @@
             "includePath": [
                 "c:/Users/Jakob/Documents/Git Repos/microcontroller-project/mc_project_5_baremetal/include",
                 "c:/Users/Jakob/Documents/Git Repos/microcontroller-project/mc_project_5_baremetal/src",
-                "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Adafruit_TinyUSB_Arduino/src",
                 "C:/Users/Jakob/.platformio/packages/framework-cmsis/CMSIS/Core/Include",
                 "C:/Users/Jakob/.platformio/packages/framework-cmsis/CMSIS/DSP/Include",
                 "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/cores/nRF5/nordic",
@@ -50,6 +49,7 @@
                 "c:/Users/Jakob/Documents/Git Repos/microcontroller-project/mc_project_5_baremetal/.pio/libdeps/adafruit_itsybitsy_nrf52840/SD",
                 "c:/Users/Jakob/Documents/Git Repos/microcontroller-project/mc_project_5_baremetal/.pio/libdeps/adafruit_itsybitsy_nrf52840/SdFat - Adafruit Fork/src",
                 "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Adafruit_LittleFS/src",
+                "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Adafruit_TinyUSB_Arduino/src",
                 "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Adafruit_nRFCrypto/src",
                 "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/BLEAdafruitService/src",
                 "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/BLEHomekit/src",
@@ -68,7 +68,6 @@
                 "path": [
                     "c:/Users/Jakob/Documents/Git Repos/microcontroller-project/mc_project_5_baremetal/include",
                     "c:/Users/Jakob/Documents/Git Repos/microcontroller-project/mc_project_5_baremetal/src",
-                    "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Adafruit_TinyUSB_Arduino/src",
                     "C:/Users/Jakob/.platformio/packages/framework-cmsis/CMSIS/Core/Include",
                     "C:/Users/Jakob/.platformio/packages/framework-cmsis/CMSIS/DSP/Include",
                     "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/cores/nRF5/nordic",
@@ -108,6 +107,7 @@
                     "c:/Users/Jakob/Documents/Git Repos/microcontroller-project/mc_project_5_baremetal/.pio/libdeps/adafruit_itsybitsy_nrf52840/SD",
                     "c:/Users/Jakob/Documents/Git Repos/microcontroller-project/mc_project_5_baremetal/.pio/libdeps/adafruit_itsybitsy_nrf52840/SdFat - Adafruit Fork/src",
                     "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Adafruit_LittleFS/src",
+                    "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Adafruit_TinyUSB_Arduino/src",
                     "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/Adafruit_nRFCrypto/src",
                     "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/BLEAdafruitService/src",
                     "C:/Users/Jakob/.platformio/packages/framework-arduinoadafruitnrf52/libraries/BLEHomekit/src",
