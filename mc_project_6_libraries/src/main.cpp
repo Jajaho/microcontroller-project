@@ -22,6 +22,9 @@
 #define TFT_DC A2    // data/command *put your pin here*
 #define TFT_RST A4   // reset *put your pin here*
 #define TFT_BL A3    // backlight *put your pin here*
+
+#define SCREEN_HEIGHT 240
+#define SCREEN_WIDTH 320
 //input: chip select; data/command and reset pin -> reqquired for the library
 Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
@@ -38,8 +41,8 @@ unsigned long sensorSpeed = 0;    // Time it took the sensor to measure the pres
 unsigned long measPeriod = 300;   // Set the measurement interval to 10ms
 unsigned long timeStamp = 0;      // Set at the beginning to achieve constant measurement period
 
-int16_t xCursor = 0;
-int16_t yCursor = 0;
+int16_t xCursor = 70;
+int16_t yCursor = 130;
 
 void panicISR();
 void pumpControlISR();
@@ -84,14 +87,14 @@ void setup() {
   pinMode(TFT_CS, OUTPUT);
   pinMode(TFT_RST, OUTPUT);
   //initializing of display
-  display.init(240, 320);
+  display.init(SCREEN_WIDTH, SCREEN_HEIGHT);
   display.setRotation(3);
   display.fillScreen(ST77XX_BLACK);
-  display.setCursor(0, 0);
+  display.setCursor(xCursor, yCursor);
   display.setTextWrap(true);
   display.setTextSize(4);
 
-  display.print("Hello World!");
+  //display.print("Hello World!");
 
 }
 
@@ -135,6 +138,10 @@ void loop() {
 
     pressure_hPa = pressureSensor.readPressure();
     sensorSpeed = millis() - startTimer;
+    
+    display.fillScreen(ST77XX_BLACK);
+    display.setCursor(xCursor, yCursor);
+    display.print(pressure_hPa);
 
     Serial.print("Pressure (hPa): "); //Print the measured pressure
     Serial.println(pressure_hPa);
