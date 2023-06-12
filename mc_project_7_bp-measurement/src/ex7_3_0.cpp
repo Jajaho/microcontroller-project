@@ -100,7 +100,8 @@ void loop() {
   while (digitalRead(startButton) == HIGH) {}
 
   flagInterrupt = false;
-  //PUT YOUR CODE HERE
+
+  /* PUT YOUR CODE HERE */
   
   //write measurement array to a .txt file
   if (!flagInterrupt) {
