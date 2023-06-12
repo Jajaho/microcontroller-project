@@ -45,7 +45,10 @@ uint16_t measSample[12000]; //array for the measured samples, maximum 2 minutes 
 int16_t HPmeasSample[12000]; //array of the highpass filtered samples
 int writeCount = 0; //used for print counter every 500ms and position in array to write to
 
-void main() {
+//Interrupt function
+void interruptFunction();
+
+int main() {
   //start serial communication and set baud rate
   Serial.begin(9600);
   Serial.println("MPRLS Simple Test");
@@ -131,4 +134,16 @@ void main() {
 
 void interruptFunction() {
 flagInterrupt = true;
+}
+
+//function of the highpass filter
+void HPfilter(float* pressure, float* HP_5Hz, float* HP_0_5Hz) {
+  *(HP_5Hz + 1) = *(HP_5Hz); //Shift buffer
+  *(HP_0_5Hz + 1) = *(HP_0_5Hz); //Shift buffer
+
+  //Highpass filter in time domain
+  *(HP_5Hz) = HPnominator_5Hz * (*(pressure) - *(pressure + 1)) +
+  HPdenominator_5Hz * (*(HP_5Hz + 1));
+  *(HP_0_5Hz) = HPnominator_0_5Hz * (*(HP_5Hz) - *(HP_5Hz + 1)) +
+  HPdenominator_0_5Hz * (*(HP_0_5Hz + 1));
 }
