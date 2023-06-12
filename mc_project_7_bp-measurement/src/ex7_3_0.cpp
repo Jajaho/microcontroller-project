@@ -45,10 +45,12 @@ uint16_t measSample[12000]; //array for the measured samples, maximum 2 minutes 
 int16_t HPmeasSample[12000]; //array of the highpass filtered samples
 int writeCount = 0; //used for print counter every 500ms and position in array to write to
 
+
+// ----------------------- Function prototypes ----------------------- //
 //Interrupt function
 void interruptFunction();
 
-int main() {
+void setup() {
   //start serial communication and set baud rate
   Serial.begin(9600);
   Serial.println("MPRLS Simple Test");
@@ -83,54 +85,56 @@ int main() {
   pinMode(VALVE, OUTPUT);
   digitalWrite(VALVE, LOW);
 
+}
 
-  while(1) {
-    //refresh memory of sample-buffer
-    memset(currentPressure, 0, sizeof(currentPressure));
-    memset(measSample, 0, sizeof(measSample));
-    memset(HPbuffer_5Hz, 0, sizeof(HPbuffer_5Hz));
-    memset(HPbuffer_0_5Hz, 0, sizeof(HPbuffer_0_5Hz));
-    memset(HPmeasSample, 0, sizeof(HPmeasSample));
-    writeCount = 0;
-    Serial.println("Press the green button to start!");
-    
-    while (digitalRead(startButton) == HIGH) {}
+void loop() {
+  //refresh memory of sample-buffer
+  memset(currentPressure, 0, sizeof(currentPressure));
+  memset(measSample, 0, sizeof(measSample));
+  memset(HPbuffer_5Hz, 0, sizeof(HPbuffer_5Hz));
+  memset(HPbuffer_0_5Hz, 0, sizeof(HPbuffer_0_5Hz));
+  memset(HPmeasSample, 0, sizeof(HPmeasSample));
+  writeCount = 0;
+  Serial.println("Press the green button to start!");
+  
+  while (digitalRead(startButton) == HIGH) {}
 
-    flagInterrupt = false;
-    //PUT YOUR CODE HERE
-    //write measurement array to a .txt file
-    if (!flagInterrupt) {
-      fatfs.remove("pressureMeasurement.txt");
-      myFile = fatfs.open("pressureMeasurement.txt", FILE_WRITE);
-      if (myFile) {
-        Serial.print("Writing to pressureMeasurement.txt...");
-        for (int i = 0; i < sizeof(measSample) / 2; i++) {
-          myFile.print(measSample[i]);
-          myFile.print(",");
-        }
-        myFile.close();
-        Serial.println("done!");
-      } else {
-          Serial.println("error opening pressureTest.txt");
+  flagInterrupt = false;
+  //PUT YOUR CODE HERE
+  
+  //write measurement array to a .txt file
+  if (!flagInterrupt) {
+    fatfs.remove("pressureMeasurement.txt");
+    myFile = fatfs.open("pressureMeasurement.txt", FILE_WRITE);
+    if (myFile) {
+      Serial.print("Writing to pressureMeasurement.txt...");
+      for (int i = 0; i < sizeof(measSample) / 2; i++) {
+        myFile.print(measSample[i]);
+        myFile.print(",");
       }
-
-      fatfs.remove("HPpressureMeasurement.txt");
-      myFile = fatfs.open("HPpressureMeasurement.txt", FILE_WRITE);
-
-      if (myFile) {
-        Serial.print("Writing to HPpressureMeasurement.txt...");
-        for (int i = 0; i < sizeof(measSample) / 2; i++) {
-          myFile.print(HPmeasSample[i]);
-          myFile.print(",");
-        }
-        myFile.close();
-        Serial.println("done!");
-      } else {
+      myFile.close();
+      Serial.println("done!");
+    } else {
         Serial.println("error opening pressureTest.txt");
+    }
+
+    fatfs.remove("HPpressureMeasurement.txt");
+    myFile = fatfs.open("HPpressureMeasurement.txt", FILE_WRITE);
+
+    if (myFile) {
+      Serial.print("Writing to HPpressureMeasurement.txt...");
+      for (int i = 0; i < sizeof(measSample) / 2; i++) {
+        myFile.print(HPmeasSample[i]);
+        myFile.print(",");
       }
+      myFile.close();
+      Serial.println("done!");
+    } else {
+      Serial.println("error opening pressureTest.txt");
     }
   }
 }
+
 
 void interruptFunction() {
 flagInterrupt = true;
