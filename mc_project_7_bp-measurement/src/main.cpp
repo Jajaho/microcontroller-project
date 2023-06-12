@@ -1,173 +1,134 @@
 #include <Arduino.h>
+#include <Adafruit_TinyUSB.h> // for Serial
 #include <Wire.h>
+#include "Adafruit_MPRLS.h"
 #include <SPI.h>
-#include <Adafruit_GFX.h>     // Core graphics library
-#include <Adafruit_ST7789.h>  // Hardware-specific library for ST7789
-#include <Adafruit_TinyUSB.h>
-#include <Adafruit_MPRLS.h>
+#include <math.h>
+#include "SdFat.h"
+#include "Adafruit_SPIFlash.h"
 
-#define RESET_PIN -1 // set to any GPIO pin # to hard-reset on begin()
-#define EOC_PIN -1 // set to any GPIO pin to read end-of-conversion by pin
+#define PUMP 9 //*put your pin here*
+#define VALVE 10 //*put your pin here*
+#define startButton 12 //*put your pin here*
+#define interruptButton 7 //*put your pin here*
+#define pressureIncrease 280 //put this value to 240+40 as overshoot compensation if you want to measure the blood pressure
+#define pressureThreshold 40 //lower threshold, when the cuff is deflated,put this value to 40 for blood pressure measurement
 
-#define LED_RED 5
-#define LED_GREEN 10
-#define BTN_RED 9
-#define BTN_GREEN 7
+#define settleTime 500 //settle time in ms, when pump/valve is turned on/off
+#define maxTime 120000 //after 2 minutes stop the measurement
+#define measPeriod 10 //10ms of sampling time
+#define HPnominator_5Hz 0.864244751836367 //filter coefficient of the nominator of the highpass filter, with f_3dB = 5Hz
+#define HPdenominator_5Hz 0.728489503672734 //filter coefficient of the denominator of the highpass filter, with f_3dB = 5Hz
+#define HPnominator_0_5Hz 0.984534960996653 //filter coefficient of the nominator of the highpass filter, with f_3dB = 0.5Hz
+#define HPdenominator_0_5Hz 0.969069921993306 //filter coefficient of the denominator of the highpass filter, with f_3dB = 0.5Hz
 
-#define VALVE A0
-#define PUMP A1
+//Library object for the flash configuration
+Adafruit_FlashTransport_QSPI flashTransport;
+Adafruit_SPIFlash flash(&flashTransport);
 
-// Waveshare 17344
-#define TFT_CS A5   //chip select *put your pin here*
-#define TFT_DC A2    // data/command *put your pin here*
-#define TFT_RST A4   // reset *put your pin here*
-#define TFT_BL A3    // backlight *put your pin here*
+// file system object from SdFat
+FatVolume fatfs; //file system
+File32 myFile; //file format for the SD memory
+int readFile; //read the file position, ATTENTION: Output is decoded as integer in ASCII-format!
 
-#define SCREEN_HEIGHT 240
-#define SCREEN_WIDTH 320
-//input: chip select; data/command and reset pin -> reqquired for the library
-Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+//Library for the pressure sensor
+Adafruit_MPRLS pressureSensor = Adafruit_MPRLS();
+float currentPressure[2]; //intermediate pressure values, with buffer of last value
+float startPressure = 0; //intermediate pressure values
+volatile bool flagInterrupt = false; //emergency flag from the interrupt
+unsigned long startTimer = 0; //startpoint of the timer
+unsigned long endTimer = 0; //endpoint of the timer
+unsigned long startMaxTimer = 0; //start the timer at the beginning of the whole measurement process, to have a maximum time to stop
+float HPbuffer_5Hz[2]; //buffer of last two highpass filter values, with f_3dB = 5Hz
+float HPbuffer_0_5Hz[2]; //buffer of last two highpass filter values, with f_3dB = 0.5Hz
+uint16_t measSample[12000]; //array for the measured samples, maximum 2 minutes every 10ms -> 12000 entries
+int16_t HPmeasSample[12000]; //array of the highpass filtered samples
+int writeCount = 0; //used for print counter every 500ms and position in array to write to
 
-Adafruit_MPRLS pressureSensor = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
+void main() {
+  //start serial communication and set baud rate
+  Serial.begin(9600);
+  Serial.println("MPRLS Simple Test");
 
-float pressure_hPa = 0;
-float targetPressure = 1000;
-
-volatile bool panicFlag = false;  //flag to signal that an interrupt has been detected
-volatile bool pumpFlag = false;
-
-unsigned long startTimer = 0;     // Timestamp of the last measurement
-unsigned long sensorSpeed = 0;    // Time it took the sensor to measure the pressure and communicate to the uC
-unsigned long measPeriod = 300;   // Set the measurement interval to 10ms
-unsigned long timeStamp = 0;      // Set at the beginning to achieve constant measurement period
-
-int16_t xCursor = 70;
-int16_t yCursor = 130;
-
-void panicISR();
-void pumpControlISR();
-
-void setup() {
-  // -----  Inputs  --------
-  pinMode(BTN_RED, INPUT_PULLUP);   // Button is active low!
-  pinMode(BTN_GREEN, INPUT_PULLUP); // Button is active low!
-
-  // -----  Outputs  --------
-  // LEDs:
-  pinMode(LED_GREEN, OUTPUT);
-  digitalWrite(LED_GREEN, LOW);
-
-  pinMode(LED_RED, OUTPUT);
-  digitalWrite(LED_RED, LOW);
-
-  pinMode(LED_BUILTIN, OUTPUT);   
-  digitalWrite(LED_BUILTIN, LOW);
-
-  //Actuators:
-  pinMode(VALVE, OUTPUT);
-  digitalWrite(VALVE, HIGH);
-
-  pinMode(PUMP, OUTPUT);   
-  digitalWrite(PUMP, LOW);
-
-  attachInterrupt(digitalPinToInterrupt(BTN_RED), panicISR, FALLING);
-  attachInterrupt(digitalPinToInterrupt(BTN_GREEN), pumpControlISR, FALLING);
-
-  Serial.begin(115200);
-  Serial.println("Initializing MPRLS");
-  if (! pressureSensor.begin()) {
+  if (!pressureSensor.begin()) {
     Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
     while (1) {
-      delay(10);
+    delay(10);
     }
   }
-  Serial.println("MPRLS sensor initialized.");
 
-  pinMode(TFT_BL, OUTPUT);
-  pinMode(TFT_CS, OUTPUT);
-  pinMode(TFT_RST, OUTPUT);
-  //initializing of display
-  display.init(SCREEN_WIDTH, SCREEN_HEIGHT);
-  display.setRotation(3);
-  display.fillScreen(ST77XX_BLACK);
-  display.setCursor(xCursor, yCursor);
-  display.setTextWrap(true);
-  display.setTextSize(4);
+  Serial.println("Found MPRLS sensor");
+  Serial.println("Initializing Filesystem on external flash...");
 
-  //display.print("Hello World!");
+  // Init external flash
+  flash.begin();
 
-}
-
-void loop() {
-
-  if(panicFlag) {
-    Serial.println("Panic! Operation has been halted. Reset to continue.");
-    digitalWrite(LED_RED, HIGH);
-    digitalWrite(PUMP, LOW);
-    digitalWrite(BTN_GREEN, LOW);
-  }
-  else {
-    digitalWrite(LED_RED, LOW);
-  }
-
-  if(pumpFlag)
-  {
-    digitalWrite(PUMP, HIGH);
-    digitalWrite(LED_GREEN, HIGH);
-  }
-  else {
-    digitalWrite(PUMP, LOW);
-    digitalWrite(LED_GREEN, LOW);
-  }
-  
-  if (pumpFlag && (pressure_hPa >= targetPressure))
-  {
-    pumpFlag = false;
-  }
-  
-  
-
-  timeStamp = millis();
-  if (timeStamp - startTimer >= measPeriod) {
-    if (pumpFlag) {
-      digitalWrite(VALVE, LOW);
-      delay(100);
+  // Open file system on the flash
+  if (!fatfs.begin(&flash)) {
+    Serial.println("Error: filesystem is not existed. Please try SdFat_format example to make one.");
+    while (1) {
+    delay(10);
     }
-    
-    startTimer = timeStamp;
-
-    pressure_hPa = pressureSensor.readPressure();
-    sensorSpeed = millis() - startTimer;
-    
-    display.fillScreen(ST77XX_BLACK);
-    display.setCursor(xCursor, yCursor);
-    display.print(pressure_hPa);
-
-    Serial.print("Pressure (hPa): "); //Print the measured pressure
-    Serial.println(pressure_hPa);
-    Serial.print("Read-out speed (ms): "); //Print the read-out time of one measurement
-    Serial.println(sensorSpeed);
-
-    /*
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(100);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(100);
-    */  
-    Serial.print("panicFlag: ");
-    Serial.println(panicFlag);
-    Serial.print("pumpFlag: ");
-    Serial.println(pumpFlag);
   }
-  
+
+  Serial.println("initialization done.");
+  pinMode(startButton, INPUT_PULLUP);
+  pinMode(interruptButton, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(interruptButton), interruptFunction, CHANGE);
+  pinMode(PUMP, OUTPUT);
+  digitalWrite(PUMP, LOW);
+  pinMode(VALVE, OUTPUT);
+  digitalWrite(VALVE, LOW);
+
+
+  while(1) {
+    //refresh memory of sample-buffer
+    memset(currentPressure, 0, sizeof(currentPressure));
+    memset(measSample, 0, sizeof(measSample));
+    memset(HPbuffer_5Hz, 0, sizeof(HPbuffer_5Hz));
+    memset(HPbuffer_0_5Hz, 0, sizeof(HPbuffer_0_5Hz));
+    memset(HPmeasSample, 0, sizeof(HPmeasSample));
+    writeCount = 0;
+    Serial.println("Press the green button to start!");
+    
+    while (digitalRead(startButton) == HIGH) {}
+
+    flagInterrupt = false;
+    /*put your code here*/
+    //write measurement array to a .txt file
+    if (!flagInterrupt) {
+      fatfs.remove("pressureMeasurement.txt");
+      myFile = fatfs.open("pressureMeasurement.txt", FILE_WRITE);
+      if (myFile) {
+        Serial.print("Writing to pressureMeasurement.txt...");
+        for (int i = 0; i < sizeof(measSample) / 2; i++) {
+          myFile.print(measSample[i]);
+          myFile.print(",");
+        }
+        myFile.close();
+        Serial.println("done!");
+      } else {
+          Serial.println("error opening pressureTest.txt");
+      }
+
+      fatfs.remove("HPpressureMeasurement.txt");
+      myFile = fatfs.open("HPpressureMeasurement.txt", FILE_WRITE);
+
+      if (myFile) {
+        Serial.print("Writing to HPpressureMeasurement.txt...");
+        for (int i = 0; i < sizeof(measSample) / 2; i++) {
+          myFile.print(HPmeasSample[i]);
+          myFile.print(",");
+        }
+        myFile.close();
+        Serial.println("done!");
+      } else {
+        Serial.println("error opening pressureTest.txt");
+      }
+    }
+  }
 }
 
-void panicISR() {
-  panicFlag = true;
-  pumpFlag = false;
-}
-
-void pumpControlISR() {
-  pumpFlag = true;
-  panicFlag = false;
+void interruptFunction() {
+flagInterrupt = true;
 }

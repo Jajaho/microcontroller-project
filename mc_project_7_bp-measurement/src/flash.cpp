@@ -1,7 +1,8 @@
 #include <Arduino.h>
+#include <SdFat.h>
 #include <Adafruit_SPIFlash.h>
 
-#include "main.h"
+//#include "main.h"
 
 // file system object from SdFat
 File32 myFile;
@@ -9,7 +10,7 @@ FatVolume fatfs;
 
 int readFile;
 String printData;
-
+/*
 void setupIO()
 {
     pinMode(BUT_G, INPUT_PULLUP); // PULLUP and switch closes to GND
@@ -25,7 +26,7 @@ void setupIO()
     pinMode(TFT_BL, OUTPUT);
     digitalWrite(TFT_BL, HIGH);
 }
-
+*/
 void writeToFile(Adafruit_SPIFlash flash)
 {
     // Open file system on the flash
