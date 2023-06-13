@@ -7,10 +7,17 @@
 #include "SdFat.h"
 #include "Adafruit_SPIFlash.h"
 
-#define PUMP 9 //*put your pin here*
-#define VALVE 10 //*put your pin here*
-#define startButton 12 //*put your pin here*
-#define interruptButton 7 //*put your pin here*
+#define RESET_PIN -1 // set to any GPIO pin # to hard-reset on begin()
+#define EOC 12 // set to any GPIO pin to read end-of-conversion by pin
+
+#define LED_RED 5
+#define LED_GREEN 10
+#define BTN_RED 9
+#define BTN_GREEN 7
+
+#define VALVE A0
+#define PUMP A1
+
 #define pressureIncrease 280 //put this value to 240+40 as overshoot compensation if you want to measure the blood pressure
 #define pressureThreshold 40 //lower threshold, when the cuff is deflated,put this value to 40 for blood pressure measurement
 
@@ -35,12 +42,18 @@ int readFile; //read the file position, ATTENTION: Output is decoded as integer 
 Adafruit_MPRLS pressureSensor = Adafruit_MPRLS();
 float currentPressure[2]; //intermediate pressure values, with buffer of last value
 float startPressure = 0; //intermediate pressure values
+
 volatile bool flagInterrupt = false; //emergency flag from the interrupt
+volatile bool pumpFlag = false; //flag for the pump control
+
 unsigned long startTimer = 0; //startpoint of the timer
 unsigned long endTimer = 0; //endpoint of the timer
+unsigned long timeStamp = 0; //timestamp of the current measurement
 unsigned long startMaxTimer = 0; //start the timer at the beginning of the whole measurement process, to have a maximum time to stop
+
 float HPbuffer_5Hz[2]; //buffer of last two highpass filter values, with f_3dB = 5Hz
 float HPbuffer_0_5Hz[2]; //buffer of last two highpass filter values, with f_3dB = 0.5Hz
+
 uint16_t measSample[12000]; //array for the measured samples, maximum 2 minutes every 10ms -> 12000 entries
 int16_t HPmeasSample[12000]; //array of the highpass filtered samples
 int writeCount = 0; //used for print counter every 500ms and position in array to write to
@@ -51,6 +64,29 @@ int writeCount = 0; //used for print counter every 500ms and position in array t
 void interruptFunction();
 
 void setup() {
+
+  // -----  Inputs  -------- //
+  pinMode(BTN_RED, INPUT_PULLUP);   // Button is active low!
+  pinMode(BTN_GREEN, INPUT_PULLUP); // Button is active low!
+
+  // -----  Outputs  -------- //
+  // LEDs:
+  pinMode(LED_GREEN, OUTPUT);
+  digitalWrite(LED_GREEN, LOW);
+
+  pinMode(LED_RED, OUTPUT);
+  digitalWrite(LED_RED, LOW);
+
+  // ----- Actuators --------- //
+  pinMode(VALVE, OUTPUT);
+  digitalWrite(VALVE, HIGH);
+
+  pinMode(PUMP, OUTPUT);   
+  digitalWrite(PUMP, LOW);
+
+  attachInterrupt(digitalPinToInterrupt(BTN_RED), panicISR, FALLING);
+  //attachInterrupt(digitalPinToInterrupt(BTN_GREEN), pumpControlISR, FALLING);
+
   //start serial communication and set baud rate
   Serial.begin(9600);
   Serial.println("MPRLS Simple Test");
@@ -61,7 +97,6 @@ void setup() {
     delay(10);
     }
   }
-
   Serial.println("Found MPRLS sensor");
   Serial.println("Initializing Filesystem on external flash...");
 
@@ -77,13 +112,13 @@ void setup() {
   }
 
   Serial.println("initialization done.");
-  pinMode(startButton, INPUT_PULLUP);
-  pinMode(interruptButton, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(interruptButton), interruptFunction, CHANGE);
-  pinMode(PUMP, OUTPUT);
-  digitalWrite(PUMP, LOW);
-  pinMode(VALVE, OUTPUT);
-  digitalWrite(VALVE, LOW);
+  //pinMode(BTN_GREEN, INPUT_PULLUP);
+  //pinMode(BTN_RED, INPUT_PULLUP);
+  //attachInterrupt(digitalPinToInterrupt(interruptButton), interruptFunction, CHANGE);
+  //pinMode(PUMP, OUTPUT);
+  //digitalWrite(PUMP, LOW);
+  //pinMode(VALVE, OUTPUT);
+  //digitalWrite(VALVE, LOW);
 
 }
 
@@ -97,11 +132,32 @@ void loop() {
   writeCount = 0;
   Serial.println("Press the green button to start!");
   
-  while (digitalRead(startButton) == HIGH) {}
+  while (digitalRead(BTN_GREEN) == HIGH) {}
 
   flagInterrupt = false;
 
-  /* PUT YOUR CODE HERE */
+  // PUT YOUR CODE HERE 
+
+  startTimer = millis();
+  endTimer = startTimer + maxTime;
+  startPressure = pressureSensor.readPressure();
+  while (millis() < endTimer)
+  {
+
+    timeStamp = millis();
+    if (timeStamp - startTimer >= measPeriod) {
+      if (pumpFlag) {
+        digitalWrite(VALVE, LOW);
+        delay(6);
+      }
+      
+      startTimer = timeStamp; // set the timestamp of the current measurement
+
+      pressure_hPa = pressureSensor.readPressure();
+    }
+  }
+  
+  
   
   //write measurement array to a .txt file
   if (!flagInterrupt) {
@@ -137,9 +193,12 @@ void loop() {
 }
 
 
-void interruptFunction() {
-flagInterrupt = true;
+void panicISR() {
+  digitalWrite(VALVE, LOW);
+  digitalWrite(PUMP, LOW);
+  flagInterrupt = true;
 }
+
 
 //function of the highpass filter
 void HPfilter(float* pressure, float* HP_5Hz, float* HP_0_5Hz) {
