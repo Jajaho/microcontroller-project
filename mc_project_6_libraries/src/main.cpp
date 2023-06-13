@@ -48,11 +48,11 @@ void panicISR();
 void pumpControlISR();
 
 void setup() {
-  // -----  Inputs  --------
+  // -----  Inputs  -------- //
   pinMode(BTN_RED, INPUT_PULLUP);   // Button is active low!
   pinMode(BTN_GREEN, INPUT_PULLUP); // Button is active low!
 
-  // -----  Outputs  --------
+  // -----  Outputs  -------- //
   // LEDs:
   pinMode(LED_GREEN, OUTPUT);
   digitalWrite(LED_GREEN, LOW);
@@ -63,7 +63,7 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);   
   digitalWrite(LED_BUILTIN, LOW);
 
-  //Actuators:
+  // ----- Actuators --------- //
   pinMode(VALVE, OUTPUT);
   digitalWrite(VALVE, HIGH);
 
@@ -131,10 +131,10 @@ void loop() {
   if (timeStamp - startTimer >= measPeriod) {
     if (pumpFlag) {
       digitalWrite(VALVE, LOW);
-      delay(100);
+      delay(6);
     }
     
-    startTimer = timeStamp;
+    startTimer = timeStamp; // set the timestamp of the current measurement
 
     pressure_hPa = pressureSensor.readPressure();
     sensorSpeed = millis() - startTimer;
