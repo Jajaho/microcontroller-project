@@ -129,9 +129,9 @@ void loop() {
 
   Serial.println("Press the green button to start!");
   while (digitalRead(startButton) == HIGH) {
-    digitalWrite(PUMP, HIGH);
+    digitalWrite(LED_GREEN, HIGH);
     delay(500);
-    digitalWrite(PUMP, LOW);
+    digitalWrite(LED_GREEN, LOW);
     delay(500);
   }
   flagInterrupt = false;
