@@ -251,7 +251,7 @@ void loop() {
 }
 
 
-/// @brief  
+/// @brief Uses the buffered data to find the heartbeat
 void findHeartbeat() {
   flagHeart = false;
   absMax = 0;
@@ -301,6 +301,7 @@ void findHeartbeat() {
   for (int l = 0; l < NOP; l++) {
     if (absMax < peakMeas[i]) {
       absMax = peakMeas[i];
+      indexAbsMax = i;
     }
   }
 
@@ -314,7 +315,8 @@ void findHeartbeat() {
       i++;      
     }
   }
-
+  Serial.println(tPeakMeasTh[0]);
+  Serial.println(tPeakMeasTh[i]);
   // Calculate the heart rate in bpm
   heartRate = 360 / (tPeakMeasTh[i] - tPeakMeasTh[0]) * 10; 
 
