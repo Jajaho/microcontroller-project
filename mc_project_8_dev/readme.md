@@ -1,0 +1,1 @@
+- Wenn man den SW button beim einstecken gedrückt hält erhält man zugriff zum flash verzeichnis des bootloaders und versetzt das board in den programmier modus. Das programieren ist auch außerhalb dieses modus möglich, jedoch nur zuverlässig wenn man davor den reset taster einmal drückt bevor man den uC beschreibt.
