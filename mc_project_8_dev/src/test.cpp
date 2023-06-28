@@ -55,8 +55,8 @@ String printData;  //print data to console as string
 uint16_t measSample[NOS];   //array for the measured samples, maximum 2 minutes every 10ms -> 12000 entries
 int16_t HPmeasSample[NOS];  //array of the highpass filtered samples
 
-int tPeakMeas[NOP];       //timestamp of the detected peak
-int tPeakMeasTh[NOP];     //timestamp of the buffer
+int16_t tPeakMeas[NOP];       //timestamp of the detected peak
+int16_t tPeakMeasTh[NOP];     //timestamp of the buffer
 int16_t peakMeas[NOP];    //buffer for the detected peak, maximum 2 minutes with heart rate of 180/min
 int16_t peakMeasTh[NOP];  //buffer for the detected peak, after threshold detection
 
@@ -71,7 +71,8 @@ bool flagHeart = false; //flag if heartbeat is detected
 float heartRate = 0;  //final heart rate
 
 void findHeartbeat();
-int16_t read_file(String filename);
+int16_t * read_file(String filename);
+void print_array(int16_t *array, int16_t length);
 void readHPP_from_file();
 
 void setup() {
@@ -128,11 +129,18 @@ void loop() {
         readHPP_from_file();
         findHeartbeat();
 
-        Serial.println("Drucke array:");
-        for (size_t i = 0; i < 360; i++)
-        {
-            Serial.println(HPmeasSample[i]);
-        }
+        Serial.println("PeakMeas:");
+        print_array(peakMeas, NOP);
+
+        Serial.println("tPeakMeas:");
+        print_array(tPeakMeas, NOP);
+
+        Serial.println("PeakMeasTh:");
+        print_array(peakMeasTh, NOP);
+
+        Serial.println("tPeakMeasTh:");
+        print_array(tPeakMeasTh, NOP);
+
         
     }
     delay(1000);
@@ -231,10 +239,19 @@ void findHeartbeat() {
   Serial.print("Index absolut maxima: ");
   Serial.println(indexAbsMax);
   Serial.print("Heart-rate /1/min): ");
-  Serial.println(heartRate);
+  Serial.println(round(heartRate));
   Serial.println("Finished printing!");
   Serial.println("\n ################### \n");
   delay(1000);
+}
+
+void print_array(int16_t *array, int16_t size) {
+    for (size_t i = 0; i < size; i++)
+    {
+        if (array[i] != 0)
+            Serial.println(array[i]);
+    }
+    
 }
 
 void readHPP_from_file() {
@@ -260,7 +277,8 @@ void readHPP_from_file() {
     indexSweep = 0;
 }
 
-int16_t read_file(String filename) {
+// doesn't work don't use
+int16_t * read_file(String filename) {
     int16_t buffer[NOS];
     myFile = fatfs.open(filename);  //open the file "pressureTest.txt" in read mode");
 
@@ -290,6 +308,7 @@ int16_t read_file(String filename) {
     } else {
         Serial.println("error opening file");
     }
+    return buffer;
 }
 
 // Callback invoked when received READ10 command.
