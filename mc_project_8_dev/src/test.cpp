@@ -279,40 +279,6 @@ void readHPP_from_file() {
     Serial.println("done.");
 }
 
-// doesn't work don't use
-int16_t * read_file(String filename) {
-    int16_t buffer[NOS];
-    myFile = fatfs.open(filename);  //open the file "pressureTest.txt" in read mode");
-
-    if (myFile) {
-        Serial.println(filename);
-        size_t i = 0;
-        size_t exponent = 0;
-        int16_t tmp = 0;
-        while (myFile.available()) {  // read from the file until there's nothing else in it
-
-            readFile = myFile.read();  //read every character of pressureTest.txt
-
-            if ((char)readFile == ',') {          //read number until a comma is detected
-                Serial.println(printData.toInt());  //print data to the console -> print with "Serial Plotter"
-                buffer[i] = tmp;
-                printData = "";
-                i++;
-                exponent = 0;
-            } else {
-                printData += (char)readFile;  //concatenate the char to string
-                tmp += pow(10, exponent) * printData.toInt();
-                exponent++;
-            }
-        }
-        myFile.close();
-        Serial.println("finished printing file.");
-    } else {
-        Serial.println("error opening file");
-    }
-    return buffer;
-}
-
 // Callback invoked when received READ10 command.
 // Copy disk’s data to buffer (up to bufsize) and
 // return number of copied bytes (must be multiple of block size)
