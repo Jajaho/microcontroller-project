@@ -4,6 +4,8 @@
 #include "Adafruit_TinyUSB.h"
 #include <math.h>
 
+#define DEBUG
+
 #define NOS 12000
 #define NOP 360
 
@@ -120,6 +122,7 @@ void loop() {
     
 }
 
+/// @brief Uses the buffered data to find the heartbeat
 void findHeartbeat() {
 
     int16_t tPeakMeas[NOP];       //timestamp of the detected peak
@@ -192,10 +195,11 @@ void findHeartbeat() {
     }
 
     size_t heartrate_index = 0;
-    // Find the largest peak in the previously found and filtered peaks
+
     for (int l = 0; l < NOP; l++) {
         if (peakMeasTh[l] == 0) {
             heartrate_index = l / 2;
+
             break;
         }
     }
@@ -213,7 +217,13 @@ void findHeartbeat() {
         if (k + 1 >= NOP) {
             break;
         }
+        #ifdef DEBUG
         time += (tPeakMeasTh[k+1] - tPeakMeasTh[k]) * measPeriod;
+        Serial.print("index ");
+        Serial.print(k);
+        Serial.print(": ");
+        Serial.println(time);
+        #endif // DEBUG
     }
     // Calculate the average time between the peaks
     time = time / count;
@@ -232,19 +242,20 @@ void findHeartbeat() {
     Serial.println("\n ################### \n");
     delay(1000);
 
-    /*
-    Serial.println("PeakMeas:");
+    #ifdef DEBUG
+    Serial.println("PeakMeas;");
     print_array(peakMeas, NOP);
+    Serial.println(";");
 
-    Serial.println("tPeakMeas:");
+    Serial.println("tPeakMeas;");
     print_array(tPeakMeas, NOP);
 
-    Serial.println("PeakMeasTh:");
+    Serial.println("PeakMeasTh;");
     print_array(peakMeasTh, NOP);
 
-    Serial.println("tPeakMeasTh:");
+    Serial.println("tPeakMeasTh;");
     print_array(tPeakMeasTh, NOP);
-    */
+    #endif // DEBUG
 }
 
 void print_array(int16_t *array, int16_t size) {

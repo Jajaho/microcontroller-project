@@ -1,11 +1,15 @@
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>  // for Serial
-#include <Wire.h>
+#include <Wire.h>+++
 #include "Adafruit_MPRLS.h"
 #include <SPI.h>
 #include <math.h>
 #include "SdFat.h"
 #include "Adafruit_SPIFlash.h"
+
+// ------------------ Global Defines ------------------ //
+
+#define DEBUG
 
 #define PUMP A1    
 #define VALVE A0  
@@ -29,6 +33,8 @@
 #define HPnominator_0_5Hz 0.984534960996653    //filter coefficient of the nominator of the highpass filter, with f_3dB = 0.5Hz
 #define HPdenominator_0_5Hz 0.969069921993306  //filter coefficient of the denominator of the highpass filter, with f_3dB = 0.5Hz
 
+// ------------------ Global Variables ------------------ //
+
 //Library object for the flash configuration
 Adafruit_FlashTransport_QSPI flashTransport;
 Adafruit_SPIFlash flash(&flashTransport);
@@ -51,32 +57,20 @@ unsigned long startMaxTimer = 0;  //start the timer at the beginning of the whol
 
 float HPbuffer_5Hz[2];        //buffer of last two highpass filter values, with f_3dB = 5Hz
 float HPbuffer_0_5Hz[2];      //buffer of last two highpass filter values, with f_3dB = 0.5Hz
-uint16_t measSample[NOS];   //array for the measured samples, maximum 2 minutes every 10ms -> 12000 entries
-int16_t HPmeasSample[NOS];  //array of the highpass filtered samples
+uint16_t measSample[NOS];     //array for the measured samples, maximum 2 minutes every 10ms -> 12000 entries
+int16_t HPmeasSample[NOS];    //array of the highpass filtered samples
 
 int writeCount = 0;  //used for print counter every 500ms and position in array to write to
 
 
-//Aurel:
-
-int tPeakMeas[NOP];       //timestamp of the detected peak
-int tPeakMeasTh[NOP];     //timestamp of the buffer
-int16_t peakMeas[NOP];    //buffer for the detected peak, maximum 2 minutes with heart rate of 180/min
-int16_t peakMeasTh[NOP];  //buffer for the detected peak, after threshold detection
-
-int indexSweep = 0;   //index sweep to write in the buffer
-
-int peakMax = 0;      //intermediate maximum value of the peak
-int peakMin = 100;    //intermediate minimum value of the peak
-int absMax = 0;       //absolut maximum of the peaks
-int indexAbsMax = 0;  //index of the maximum peak
-
-bool flagHeart = false; //flag if heartbeat is detected
-float heartRate = 0;  //final heart rate
+// ------------------ Function Declaration ------------------ //
 
 void interruptFunction();
 void HPfilter(float* pressure, float* HP_5Hz, float* HP_0_5Hz);
 void findHeartbeat();
+void print_array(int16_t *array, int16_t size);
+
+// ------------------ Main Programm ------------------ //
 
 void setup() {
   pinMode(startButton, INPUT_PULLUP);
@@ -253,85 +247,137 @@ void loop() {
 
 /// @brief Uses the buffered data to find the heartbeat
 void findHeartbeat() {
-  flagHeart = false;
-  absMax = 0;
-  indexAbsMax = 0;
-  peakMax = 0;
-  peakMin = 100;
-  heartRate = 0;
 
-  indexSweep = 0;
-  int i = 0;
+    int16_t tPeakMeas[NOP];       //timestamp of the detected peak
+    int16_t tPeakMeasTh[NOP];     //timestamp of the buffer
+    int16_t peakMeas[NOP];    //buffer for the detected peak, maximum 2 minutes with heart rate of 180/min
+    int16_t peakMeasTh[NOP];  //buffer for the detected peak, after threshold detection
 
-  // reset buffer arrays
-  memset(peakMeas, 0, sizeof(peakMeas));
-  memset(tPeakMeas, 0, sizeof(tPeakMeas));
-  memset(peakMeasTh, 0, sizeof(peakMeas));
-  memset(tPeakMeasTh, 0, sizeof(tPeakMeas));
+    
+    int peakMax = 0;      //intermediate maximum value of the peak
+    int peakMin = 100;    //intermediate minimum value of the peak
+    int absMax = 0;       //absolut maximum of the peaks
+    u_int8_t indexAbsMax = 0;  //index of the maximum peak
 
-  // go through the first 360 values of the filtered data, 360 is the size of the buffer (peakMeas, tPeakMeas, ...)
-  while (i < NOS && indexSweep < NOP) {
+    bool flagHeart = false; //flag if heartbeat is detected
+    float heartRate = 0;  //final heart rate
+    
+    int indexSweep = 0;   //index sweep to write in the buffer
+    int i = 0;
 
-    // find the maximum value of the next peak in the filtered data
-    // The value '100' refers to 0.1 hPa and is used as a threshold to decern peaks from valleys
-    while (HPmeasSample[i] > 100) {
-      if (peakMax < HPmeasSample[i]) {
-        peakMax = HPmeasSample[i];
-        tPeakMeas[indexSweep] = i;
-      }
-      i++;
+    // reset buffer arrays
+    memset(peakMeas, 0, sizeof(peakMeas));
+    memset(tPeakMeas, 0, sizeof(tPeakMeas));
+    memset(peakMeasTh, 0, sizeof(peakMeas));
+    memset(tPeakMeasTh, 0, sizeof(tPeakMeas));
+
+    // go through the first 360 values of the filtered data, 360 is the size of the buffer (peakMeas, tPeakMeas, ...)
+    while (i < NOS && indexSweep < NOP) {
+
+        // find the maximum value of the next peak in the filtered data
+        // The value '100' refers to 0.1 hPa and is used as a threshold to decern peaks from valleys
+        while (HPmeasSample[i] > 100) {
+        if (peakMax < HPmeasSample[i]) {
+            peakMax = HPmeasSample[i];
+            tPeakMeas[indexSweep] = i;
+        }
+        i++;
+        }
+
+        // find the minimum of the following valley in the filtered data
+        while (HPmeasSample[i] <= 100 && i < NOS) {
+            if (peakMin > HPmeasSample[i]) {
+                peakMin = HPmeasSample[i];
+        }
+        i++;
+        }
+        peakMeas[indexSweep] = peakMax - peakMin; // Safe the difference between the maximum and the minimum of the heartbeat
+        peakMax = 0;
+        peakMin = 100;
+
+        //Serial.println(peakMeas[indexSweep]);
+        indexSweep++;
     }
 
-    // find the minimum of the following valley in the filtered data
-    while (HPmeasSample[i] <= 100 && i < NOS) {
-      if (peakMin > HPmeasSample[i]) {
-        peakMin = HPmeasSample[i];
-      }
-      i++;
+    // Find the largest peak in the previously found peaks
+    for (int l = 0; l < NOP; l++) {
+        if (absMax < peakMeas[l]) {
+        absMax = peakMeas[l];
+        indexAbsMax = l;
+        }
     }
-    peakMeas[indexSweep] = peakMax - peakMin; // Safe the difference between the maximum and the minimum of the heartbeat
-    peakMax = 0;
-    peakMin = 100;
 
-    //Serial.println(peakMeas[indexSweep]);
-    indexSweep++;
-  }
-
-  // Find the largest peak in the previously found peaks
-  for (int l = 0; l < NOP; l++) {
-    if (absMax < peakMeas[i]) {
-      absMax = peakMeas[i];
-      indexAbsMax = i;
+    // Removing false positives due to noise by threshold detection
+    i = 0;
+    for (int a = 0; a < NOP; a++) {
+        if (peakMeas[a] > 0.4 * absMax) {
+        peakMeasTh[i] = peakMeas[a];
+        tPeakMeasTh[i] = tPeakMeas[a];
+        i++;      
+        }
     }
-  }
 
-  // Removing false positives due to noise by threshold detection
-  i = 0;
-  for (int a = 0; a < NOP; a++) {
-    if (peakMeas[a] > 0.4 * absMax) {
-      peakMeasTh[i] = peakMeas[a];
-      tPeakMeasTh[i] = tPeakMeas[a];
-      Serial.println(peakMeasTh[i]);
-      i++;      
+    size_t heartrate_index = 0;
+
+    for (int l = 0; l < NOP; l++) {
+        if (peakMeasTh[l] == 0) {
+            heartrate_index = l / 2;
+
+            break;
+        }
     }
-  }
-  Serial.println(tPeakMeasTh[0]);
-  Serial.println(tPeakMeasTh[i]);
-  // Calculate the heart rate in bpm
-  heartRate = 360 / (tPeakMeasTh[i] - tPeakMeasTh[0]) * 10; 
 
-  Serial.println("done!");
-  Serial.print("Number of Peaks: ");
-  Serial.println(indexSweep);
-  Serial.print("Absolut maxima (hPa): ");
-  Serial.println(((float)absMax) / 1000.0);
-  Serial.print("Index absolut maxima: ");
-  Serial.println(indexAbsMax);
-  Serial.print("Heart-rate /1/min): ");
-  Serial.println(round(heartRate));
-  Serial.println("Finished printing!");
-  Serial.println("\n ################### \n");
-  delay(1000);
+    //Serial.print("heart rate index:");
+    //Serial.println(heartrate_index);
+
+    // Calculate the heart rate in bpm
+    const int count = 5;
+    int16_t time = 0;
+        
+
+    for (size_t k = heartrate_index; k < heartrate_index + count; k++)
+    {
+        if (k + 1 >= NOP) {
+            break;
+        }
+        #ifdef DEBUG
+        time += (tPeakMeasTh[k+1] - tPeakMeasTh[k]) * measPeriod;
+        Serial.print("index ");
+        Serial.print(k);
+        Serial.print(": ");
+        Serial.println(time);
+        #endif // DEBUG
+    }
+    // Calculate the average time between the peaks
+    time = time / count;
+    heartRate = 60000 / time;
+
+    Serial.println("done!");
+    Serial.print("Number of Peaks: ");
+    Serial.println(indexSweep);
+    Serial.print("Absolut maxima (hPa): ");
+    Serial.println(((float)absMax) / 1000.0);
+    Serial.print("Index absolut maxima: ");
+    Serial.println(indexAbsMax);
+    Serial.print("Heart-rate /1/min): ");
+    Serial.println(round(heartRate));
+    Serial.println("Finished printing!");
+    Serial.println("\n ################### \n");
+    delay(1000);
+
+    #ifdef DEBUG
+    Serial.println("PeakMeas:");
+    print_array(peakMeas, NOP);
+
+    Serial.println("tPeakMeas:");
+    print_array(tPeakMeas, NOP);
+
+    Serial.println("PeakMeasTh:");
+    print_array(peakMeasTh, NOP);
+
+    Serial.println("tPeakMeasTh:");
+    print_array(tPeakMeasTh, NOP);
+    #endif // DEBUG
 }
 
 void interruptFunction() {
@@ -348,4 +394,13 @@ void HPfilter(float* pressure, float* HP_5Hz, float* HP_0_5Hz) {
   //Highpass filter in time domain
   *(HP_5Hz) = HPnominator_5Hz * (*(pressure) - *(pressure + 1)) + HPdenominator_5Hz * (*(HP_5Hz + 1));
   *(HP_0_5Hz) = HPnominator_0_5Hz * (*(HP_5Hz) - *(HP_5Hz + 1)) + HPdenominator_0_5Hz * (*(HP_0_5Hz + 1));
+}
+
+void print_array(int16_t *array, int16_t size) {
+    for (size_t i = 0; i < size; i++)
+    {
+        if (array[i] != 0)
+            Serial.println(array[i]);
+    }
+    
 }
