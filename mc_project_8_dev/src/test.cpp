@@ -22,8 +22,8 @@
 #define settleTime 500        //settle time in ms, when pump/valve is turned on/off
 #define maxTime 120000        //after 2 minutes stop the measurement
 #define measPeriod 10         //10ms of sampling time
-#define NOS 12000             //number of samples, maximum 2 minutes every 10ms -> 12000 entries
-#define NOP 360               //number of peaks in the buffer 
+#define NOS 12000             // number of samples, maximum 2 minutes every 10ms -> 12000 entries
+#define NOP 360               // "Number Of Peaks" - Array size of the buffer for the detected peaks, maximum 2 minutes with heart rate of 180/min
 
 #define HPnominator_5Hz 0.864244751836367      //filter coefficient of the nominator of the highpass filter, with f_3dB = 5Hz
 #define HPdenominator_5Hz 0.728489503672734    //filter coefficient of the denominator of the highpass filter, with f_3dB = 5Hz
@@ -38,16 +38,7 @@ Adafruit_SPIFlash flash(&flashTransport);
 FatVolume fatfs;
 FatFile root;
 FatFile file;
-// USB Mass Storage object
-Adafruit_USBD_MSC usb_msc;
-// Check if flash is formatted
-bool fs_formatted = false;
-// Set to true when PC write to flash
-bool fs_changed = true;
 
-int32_t msc_read_cb(uint32_t lba, void* buffer, uint32_t bufsize);
-int32_t msc_write_cb(uint32_t lba, uint8_t* buffer, uint32_t bufsize);
-void msc_flush_cb(void);
 // ----------------------------------------------------------------------------
 
 File32 myFile;     //file format for the SD memory
@@ -85,31 +76,33 @@ void setup() {
     pinMode(PUMP, OUTPUT);   
     digitalWrite(PUMP, LOW);
 
-    flash.begin();
-    // Set disk vendor id, product id and revision with string up to 8, 16, 4 characters respectively
-    usb_msc.setID("Adafruit", "External Flash", "1.0");
-    // Set callback
-    usb_msc.setReadWriteCallback(msc_read_cb, msc_write_cb, msc_flush_cb);
-    // Set disk size, block size should be 512 regardless of spi flash page size
-    usb_msc.setCapacity(flash.size() / 512, 512);
-    // MSC is ready for read/write
-    usb_msc.setUnitReady(true);
-    usb_msc.begin();
-    // Init file system on the flash
-    fs_formatted = fatfs.begin(&flash);
-
     Serial.begin(9600);
     while (!Serial) delay(10); // wait for native usb
-    Serial.println("Adafruit TinyUSB Mass Storage External Flash example");
-    Serial.print("JEDEC ID: 0x");
-    Serial.println(flash.getJEDECID(), HEX);
-    Serial.print("Flash size: ");
-    Serial.print(flash.size() / 1024);
-    Serial.println(" KB");
-    
-    
-}   
+
+    Serial.println("Initializing Filesystem on external flash...");
+    // Init external flash
+    flash.begin();
+    // Open file system on the flash
+    if (!fatfs.begin(&flash)) {
+        Serial.println("Error: filesystem is not existed. Please try SdFat_format example to make one.");
+        while (1) {
+        delay(10);
+        }
+    }
+    Serial.println("initialization done.");
+}
+ 
+
 void loop() {
+    // send data only when you receive data:
+  if (Serial.available() > 0) {
+    Serial.read();
+    digitalWrite(LED_BUILTIN, HIGH);
+    readHPP_from_file();
+    findHeartbeat();
+    digitalWrite(LED_BUILTIN, LOW);
+    
+  }
     if (digitalRead(BTN_GREEN) == LOW)
     {
         digitalWrite(LED_GREEN, HIGH);
@@ -255,14 +248,18 @@ void findHeartbeat() {
 
     Serial.println("tPeakMeasTh;");
     print_array(tPeakMeasTh, NOP);
+
+    Serial.println("$");
     #endif // DEBUG
 }
 
 void print_array(int16_t *array, int16_t size) {
     for (size_t i = 0; i < size; i++)
     {
-        if (array[i] != 0)
-            Serial.println(array[i]);
+        if (array[i] != 0) {
+            Serial.print(array[i]);
+            Serial.println(",");
+        }    
     }
     
 }
@@ -288,34 +285,4 @@ void readHPP_from_file() {
     Serial.println("error opening test.txt");
     }
     Serial.println("done.");
-}
-
-// Callback invoked when received READ10 command.
-// Copy disk’s data to buffer (up to bufsize) and
-// return number of copied bytes (must be multiple of block size)
-int32_t msc_read_cb(uint32_t lba, void* buffer, uint32_t bufsize) {
-    // Note: SPIFLash Block API: readBlocks/writeBlocks/syncBlocks
-    // already include 4K sector caching internally. We don’t need to cache it, yahhhh!!
-    return flash.readBlocks(lba, (uint8_t*)buffer, bufsize / 512) ? bufsize : -1;
-}
-
-// Callback invoked when received WRITE10 command.
-// Process data in buffer to disk’s storage and
-// return number of written bytes (must be multiple of block size)
-int32_t msc_write_cb(uint32_t lba, uint8_t* buffer, uint32_t bufsize) {
-    digitalWrite(LED_BUILTIN, HIGH);
-    // Note: SPIFLash Block API: readBlocks/writeBlocks/syncBlocks
-    // already include 4K sector caching internally. We don’t need to cache it, yahhhh!!
-    return flash.writeBlocks(lba, buffer, bufsize / 512) ? bufsize : -1;
-}
-
-// Callback invoked when WRITE10 command is completed (status received and accepted by host).
-// used to flush any pending cache.
-void msc_flush_cb(void) {
-    // sync with flash
-    flash.syncBlocks();
-    // clear file system’s cache to force refresh
-    fatfs.cacheClear();
-    fs_changed = true;
-    digitalWrite(LED_BUILTIN, LOW);
 }
