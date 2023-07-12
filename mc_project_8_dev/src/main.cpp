@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>  // for Serial
 #include <Wire.h>
+#include <Adafruit_ST7789.h>  // Hardware-specific library for ST7789
 #include "Adafruit_MPRLS.h"
 #include <SPI.h>
 #include <math.h>
@@ -20,6 +21,16 @@
 #define LED_GREEN 10
 #define LED_RED 5
 
+// Waveshare 17344
+#define TFT_CS A5   //chip select 
+#define TFT_DC A2    // data/command 
+#define TFT_RST A4   // reset 
+#define TFT_BL A3    // backlight 
+
+// Display
+#define SCREEN_HEIGHT 240
+#define SCREEN_WIDTH 320
+
 #define pressureIncrease 280  //put this value to 240+40 as overshoot compensation if you want to measure the blood pressure
 #define pressureThreshold 40  //lower threshold, when the cuff is deflated, put this value to 40 for blood pressure measurement
 #define settleTime 500        //settle time in ms, when pump/valve is turned on/off
@@ -38,6 +49,10 @@
 //Library object for the flash configuration
 Adafruit_FlashTransport_QSPI flashTransport;
 Adafruit_SPIFlash flash(&flashTransport);
+
+Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
+int16_t xCursor = 70;
+int16_t yCursor = 70;
 
 // file system object from SdFat
 FatVolume fatfs;  //file system
@@ -62,6 +77,8 @@ int16_t HPmeasSample[NOS];    //array of the highpass filtered samples
 
 int writeCount = 0;  //used for print counter every 500ms and position in array to write to
 
+float heartRate = 0;  //final heart rate
+
 
 // ------------------ Function Declaration ------------------ //
 
@@ -69,6 +86,7 @@ void interruptFunction();
 void HPfilter(float* pressure, float* HP_5Hz, float* HP_0_5Hz);
 void findHeartbeat();
 void print_array(int16_t *array, int16_t size);
+void printToScreen();
 
 // ------------------ Main Programm ------------------ //
 
@@ -108,6 +126,19 @@ void setup() {
     }
   }
   Serial.println("initialization done.");
+
+  pinMode(TFT_BL, OUTPUT);
+  pinMode(TFT_CS, OUTPUT);
+  pinMode(TFT_RST, OUTPUT);
+  //initializing of display
+  display.init(SCREEN_HEIGHT, SCREEN_WIDTH);
+  display.setRotation(3);
+  display.fillScreen(ST77XX_BLACK);
+  display.setCursor(xCursor, yCursor);
+  display.setTextWrap(true);
+  display.setTextSize(3);
+
+  //display.print("Hello World!");
 }
 
 void loop() {
@@ -199,7 +230,7 @@ void loop() {
 
     writeCount += 1;
 
-    Serial.print("Increased Pressure inside the cuff (hPa): ");
+    Serial.print("Pressure (hPa): ");
     Serial.println(currentPressure[0] - startPressure);
 
     while (endTimer - startTimer < measPeriod && !flagInterrupt) {
@@ -211,6 +242,7 @@ void loop() {
 
   /*put your code here*/
   findHeartbeat();
+  printToScreen();
 
   //write measurement array to a .txt file
   if (!flagInterrupt) {
@@ -260,7 +292,7 @@ void findHeartbeat() {
     u_int8_t indexAbsMax = 0;  //index of the maximum peak
 
     bool flagHeart = false; //flag if heartbeat is detected
-    float heartRate = 0;  //final heart rate
+    
     
     int indexSweep = 0;   //index sweep to write in the buffer
     int i = 0;
@@ -378,6 +410,18 @@ void findHeartbeat() {
     Serial.println("tPeakMeasTh:");
     print_array(tPeakMeasTh, NOP);
     #endif // DEBUG
+}
+
+void printToScreen() {
+  display.fillScreen(ST77XX_BLACK);
+
+  display.print("Heart rate: ");
+  display.print(heartRate);
+
+  yCursor += 10;
+  display.setCursor(xCursor, yCursor);
+
+
 }
 
 void interruptFunction() {
